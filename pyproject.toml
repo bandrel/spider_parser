@@ -11,13 +11,13 @@ requires-python = ">=3.9"
 license = { text = "MIT" }
 
 [project.scripts]
-spider-parser = "sp:main"
+spider-parser = "spider_parser:main"
 
 [project.urls]
 Repository = "https://github.com/bandrel/spider_parser"
 
 [tool.hatch.build.targets.wheel]
-only-include = ["sp.py"]
+only-include = ["spider_parser.py"]
 
 [tool.hatch.build.targets.sdist]
-include = ["sp.py", "README.md", "pyproject.toml"]
+include = ["spider_parser.py", "README.md", "pyproject.toml"]
