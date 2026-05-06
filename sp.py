@@ -3,6 +3,7 @@
 
 import glob
 import json
+import os
 import re
 import shlex
 import socket
@@ -12,7 +13,7 @@ import argparse
 if __name__ == '__main__':
     # banner()
     parser = argparse.ArgumentParser(description='')
-    parser.add_argument('-d','--dir', type=str, default='/tmp/cme_spider_plus/', help='Directory of CME spider plus. Default is /tmp/cme_spider_plus')
+    parser.add_argument('-d','--dir', type=str, default=os.path.expanduser('~/.nxc/modules/nxc_spider_plus/'), help='Directory of nxc spider_plus output. Default is ~/.nxc/modules/nxc_spider_plus/')
     parser.add_argument('REGEX', type=str)
 
     parser.add_argument('-m','--mount',default=False, action=argparse.BooleanOptionalAction, help='Display commands necessary to create mount shares')
