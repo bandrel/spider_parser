@@ -58,6 +58,7 @@ def main():
     parser.add_argument('-y','--yolo', action='store_true', help='Run all built-in presets (yolo mode)')
     parser.add_argument('-e','--exclude', type=str, help='Path to exclusion file (format: hostname or hostname,share per line)')
     parser.add_argument('-H','--host', type=str, action='append', help='Only include specific host(s). Can be used multiple times')
+    parser.add_argument('--exclude-host', type=str, action='append', default=[], help='Exclude files whose name contains this substring (case-insensitive). Can be used multiple times.')
     args = parser.parse_args()
 
     if args.list_presets:
@@ -123,6 +124,9 @@ def main():
         hostname = '.'.join(file.split('.')[:-1])
 
         if args.host and hostname not in args.host:
+            continue
+
+        if args.exclude_host and any(s.lower() in hostname.lower() for s in args.exclude_host):
             continue
 
         if hostname in exclusions['hosts']:
