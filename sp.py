@@ -10,8 +10,7 @@ import socket
 import sys
 import argparse
 
-if __name__ == '__main__':
-    # banner()
+def main():
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('-d','--dir', type=str, default=os.path.expanduser('~/.nxc/modules/nxc_spider_plus/'), help='Directory of nxc spider_plus output. Default is ~/.nxc/modules/nxc_spider_plus/')
     parser.add_argument('REGEX', type=str)
@@ -66,5 +65,5 @@ if __name__ == '__main__':
                         print(f'mount -t cifs {shlex.quote(unc)} {shlex.quote(mount_point)} -o {shlex.quote(opts)}')
 
 
-
-
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "spider-parser"
+version = "0.1.0"
+description = "Parse NetExec spider_plus output and generate CIFS mount commands."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+
+[project.scripts]
+spider-parser = "sp:main"
+
+[project.urls]
+Repository = "https://github.com/bandrel/spider_parser"
+
+[tool.hatch.build.targets.wheel]
+only-include = ["sp.py"]
+
+[tool.hatch.build.targets.sdist]
+include = ["sp.py", "README.md", "pyproject.toml"]
