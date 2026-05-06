@@ -132,7 +132,8 @@ def main():
             try:
                 a = json.load(open_file)
             except json.decoder.JSONDecodeError:
-                pass
+                print(f'# Skipping {file_path}: invalid JSON', file=sys.stderr)
+                continue
             for key in a.keys():
                 if (hostname, key) in exclusions['shares']:
                     continue
