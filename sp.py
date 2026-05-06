@@ -34,7 +34,8 @@ def main():
             try:
                 a = json.load(open_file)
             except json.decoder.JSONDecodeError:
-                pass
+                print(f'# Skipping {file_path}: invalid JSON', file=sys.stderr)
+                continue
             for key in a.keys():
                 #If share is IPC$ we can skip it
                 if key != 'IPC$':
@@ -55,7 +56,8 @@ def main():
                 try:
                     a = json.load(open_file)
                 except json.decoder.JSONDecodeError:
-                    pass #in case of a corupt file
+                    print(f'# Skipping {file_path}: invalid JSON', file=sys.stderr)
+                    continue
                 for key in a.keys():
                     if key != 'IPC$':
                         unc = f'//{ip}/{key}'
