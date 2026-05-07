@@ -239,6 +239,7 @@ def main():
                 host_ip_cache[hostname] = None
         return host_ip_cache[hostname]
 
+    mount_emitted = False
     if args.mount:
         env, opts = build_mount_opts(args)
         for hostname, share in sorted(matched_shares):
@@ -252,6 +253,21 @@ def main():
             if env:
                 mount_cmd = f'{env} {mount_cmd}'
             print(mount_cmd)
+            mount_emitted = True
+
+    if args.acl:
+        if mount_emitted:
+            print()
+        auth = build_smb_auth(args)
+        for hostname, share in sorted(matched_shares):
+            ip = _resolve(hostname)
+            if ip is None:
+                continue
+            unc = f'//{ip}/{share}'
+            print(f'# {hostname} / {share} \u2014 DACL audit')
+            print(f"smbcacls {shlex.quote(unc)} '/' {auth}")
+            rpc_cmd = f'netsharegetinfo "{share}" 502'
+            print(f"rpcclient {auth} {ip} -c {shlex.quote(rpc_cmd)}")
 
 
 if __name__ == '__main__':
