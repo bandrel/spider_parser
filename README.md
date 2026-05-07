@@ -28,6 +28,9 @@ spider-parser -m -u USER -p PASS '.*'
 # Mount with Kerberos auth (uses ccache)
 spider-parser -m -k -u 'DOMAIN.COM/USER' --ccache /path/to/USER.ccache '.*'
 
+# Execute every emitted command (mount typically needs root)
+sudo spider-parser -m --exec -u USER -p PASS '.*'
+
 # Custom output directory
 spider-parser -d /path/to/spider_plus/ '.*'
 ```
@@ -45,11 +48,18 @@ spider-parser -a -u USER -p PASS -D CORP '.*'
 
 # DACL audit with Kerberos
 spider-parser -a -k -u 'DOMAIN.COM/USER' --ccache /path/to/USER.ccache '.*'
+
+# Execute the smbcacls commands directly
+spider-parser -a --exec -u USER -p PASS '.*'
 ```
 
-For each matched share, emits a `smbcacls` command (NTFS DACL layer). May be combined with `-m` to emit both blocks.
+For each matched share, emits a `smbcacls` command (NTFS DACL layer). May be combined with `-m` to emit both blocks. Pass `--exec` to run each emitted command (fail-fast on first non-zero exit) or `--dry-run` for an explicit print-only mode (default behavior).
 
 ## Version history
+
+### v0.3.0
+- Added `--exec` to run emitted `mount`/`smbcacls` commands directly (fail-fast on first non-zero exit, output streams live)
+- Added `--dry-run` as an explicit print-only form (mutually exclusive with `--exec`)
 
 ### v0.2.1
 - Added `-D/--domain` for NTLM auth (`-U user@domain%password` format)
