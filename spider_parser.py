@@ -26,6 +26,77 @@ PRESETS = {
 }
 
 
+def _sq(s):
+    """Shell-quote: always wrap in single quotes, escaping any embedded single quotes."""
+    return "'" + s.replace("'", "'\"'\"'") + "'"
+
+
+def build_smb_auth(args):
+    """Build the auth-string fragment used by smbcacls and rpcclient.
+
+    Kerberos: --use-krb5-ccache=<PATH> -U '<USER>'
+    NTLM:     -U '<USER>%<PASS>'
+    """
+    if args.kerberos:
+        ccache_part = f"--use-krb5-ccache={shlex.quote(args.ccache)}"
+        return f"{ccache_part} -U {_sq(args.username)}"
+    return f"-U {_sq(f'{args.username}%{args.password}')}"
+
+
+def _mount_val(s):
+    """Escape characters that are special in mount -o opt=val,opt=val strings."""
+    return s.replace(",", "%2C")
+
+
+def build_mount_opts(args):
+    """Build (env_prefix, opts_string) for the mount -t cifs command.
+
+    NTLM:     ("", "username=<U>,password=<P>")
+    Kerberos: ("KRB5CCNAME='FILE:<PATH>'",
+               "sec=krb5,username=<U>,cruid=$(id -u)")
+
+    Returns ("", opts) when no env prefix is needed; callers must check
+    `if env:` before prepending it to the mount command.
+
+    Commas in username/password are percent-encoded so they don't get
+    parsed as -o option separators by mount.cifs.
+    """
+    if args.kerberos:
+        env = f"KRB5CCNAME={_sq(f'FILE:{args.ccache}')}"
+        opts = f"sec=krb5,username={_mount_val(args.username)},cruid=$(id -u)"
+        return env, opts
+    return "", f"username={_mount_val(args.username)},password={_mount_val(args.password)}"
+
+
+def validate_auth(parser, args):
+    """Verify required auth flags for the active modes.
+
+    Safe to call unconditionally; returns immediately when neither
+    --mount nor --acl is active.
+    """
+    if not (args.mount or args.acl):
+        return
+    if args.kerberos:
+        missing = []
+        if not args.ccache:
+            missing.append("--ccache")
+        if not args.username:
+            missing.append("-u/--username")
+        if missing:
+            parser.error(
+                "Kerberos auth requires: " + ", ".join(missing)
+            )
+        return
+    # NTLM mode.
+    missing = []
+    if not args.username:
+        missing.append("-u/--username")
+    if not args.password:
+        missing.append("-p/--password")
+    if missing:
+        parser.error("NTLM auth requires: " + ", ".join(missing))
+
+
 def load_exclusions(exclude_file):
     """Load exclusion list from file. Format: hostname or hostname,share (one per line)"""
     exclusions = {'hosts': set(), 'shares': set()}
@@ -51,8 +122,11 @@ def main():
     parser.add_argument('-P', '--presets', type=str, help='Comma-separated preset names or path to JSON file containing presets')
 
     parser.add_argument('-m','--mount',default=False, action=argparse.BooleanOptionalAction, help='Display commands necessary to create mount shares')
-    parser.add_argument('-u','--username', help='Username for mount')
-    parser.add_argument('-p','--password', help='password for mount')
+    parser.add_argument('-a','--acl',default=False, action=argparse.BooleanOptionalAction, help='Display commands to audit DACLs (smbcacls + rpcclient netsharegetinfo)')
+    parser.add_argument('-u','--username', help='Username for mount/acl auth (passed verbatim into -U)')
+    parser.add_argument('-p','--password', help='Password for NTLM auth (mount/acl)')
+    parser.add_argument('-k','--kerberos', default=False, action='store_true', help='Use Kerberos auth (requires --ccache and -u)')
+    parser.add_argument('--ccache', help='Path to Kerberos credential cache file (used with -k for --mount and --acl)')
     parser.add_argument('--include-sysvol', default=False, action='store_true', help='Include SYSVOL share (ignored by default)')
     parser.add_argument('--list-presets', action='store_true', help='List all available regex presets')
     parser.add_argument('-y','--yolo', action='store_true', help='Run all built-in presets (yolo mode)')
@@ -60,6 +134,7 @@ def main():
     parser.add_argument('-H','--host', type=str, action='append', help='Only include specific host(s). Can be used multiple times')
     parser.add_argument('--exclude-host', type=str, action='append', default=[], help='Exclude files whose name contains this substring (case-insensitive). Can be used multiple times.')
     args = parser.parse_args()
+    validate_auth(parser, args)
 
     if args.list_presets:
         print("Available regex presets:")
@@ -153,23 +228,47 @@ def main():
                                     print(f'{hostname},{key},{item}')
                                 matched_shares.add((hostname, key))
                                 break
+    host_ip_cache = {}
+
+    def _resolve(hostname):
+        if hostname not in host_ip_cache:
+            try:
+                host_ip_cache[hostname] = socket.gethostbyname(hostname)
+            except socket.gaierror:
+                print(f'# DNS lookup failed for {hostname}, skipping', file=sys.stderr)
+                host_ip_cache[hostname] = None
+        return host_ip_cache[hostname]
+
+    mount_emitted = False
     if args.mount:
-        host_ip_cache = {}
+        env, opts = build_mount_opts(args)
         for hostname, share in sorted(matched_shares):
-            if hostname not in host_ip_cache:
-                try:
-                    host_ip_cache[hostname] = socket.gethostbyname(hostname)
-                except socket.gaierror:
-                    print(f'# DNS lookup failed for {hostname}, skipping', file=sys.stderr)
-                    host_ip_cache[hostname] = None
-            ip = host_ip_cache[hostname]
+            ip = _resolve(hostname)
             if ip is None:
                 continue
             unc = f'//{ip}/{share}'
             mount_point = f'/mnt/{hostname}/{share}'
-            opts = f'username={args.username},password={args.password}'
             print(f'mkdir -p {shlex.quote(mount_point)}')
-            print(f'mount -t cifs {shlex.quote(unc)} {shlex.quote(mount_point)} -o {shlex.quote(opts)}')
+            mount_cmd = f'mount -t cifs {shlex.quote(unc)} {shlex.quote(mount_point)} -o {shlex.quote(opts)}'
+            if env:
+                mount_cmd = f'{env} {mount_cmd}'
+            print(mount_cmd)
+            mount_emitted = True
+
+    if args.acl:
+        if mount_emitted:
+            print()
+        auth = build_smb_auth(args)
+        for hostname, share in sorted(matched_shares):
+            ip = _resolve(hostname)
+            if ip is None:
+                continue
+            unc = f'//{ip}/{share}'
+            print(f'# {hostname} / {share} \u2014 DACL audit')
+            print(f"smbcacls {shlex.quote(unc)} '/' {auth}")
+            share_q = share.replace('"', '\\"')
+            rpc_cmd = f'netsharegetinfo "{share_q}" 502'
+            print(f"rpcclient {auth} {ip} -c {shlex.quote(rpc_cmd)}")
 
 
 if __name__ == '__main__':
