@@ -57,6 +57,9 @@ For each matched share, emits a `smbcacls` command (NTFS DACL layer). May be com
 
 ## Version history
 
+### v0.3.1
+- `-P/--presets` with no argument now lists available presets instead of erroring (equivalent to `--list-presets`)
+
 ### v0.3.0
 - Added `--exec` to run emitted `mount`/`smbcacls` commands directly (fail-fast on first non-zero exit, output streams live)
 - Added `--dry-run` as an explicit print-only form (mutually exclusive with `--exec`)
