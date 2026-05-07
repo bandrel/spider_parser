@@ -68,6 +68,35 @@ def build_mount_opts(args):
     return "", f"username={_mount_val(args.username)},password={_mount_val(args.password)}"
 
 
+def validate_auth(parser, args):
+    """Verify required auth flags for the active modes.
+
+    Safe to call unconditionally; returns immediately when neither
+    --mount nor --acl is active.
+    """
+    if not (args.mount or args.acl):
+        return
+    if args.kerberos:
+        missing = []
+        if not args.ccache:
+            missing.append("--ccache")
+        if not args.username:
+            missing.append("-u/--username")
+        if missing:
+            parser.error(
+                "Kerberos auth requires: " + ", ".join(missing)
+            )
+        return
+    # NTLM mode.
+    missing = []
+    if not args.username:
+        missing.append("-u/--username")
+    if not args.password:
+        missing.append("-p/--password")
+    if missing:
+        parser.error("NTLM auth requires: " + ", ".join(missing))
+
+
 def load_exclusions(exclude_file):
     """Load exclusion list from file. Format: hostname or hostname,share (one per line)"""
     exclusions = {'hosts': set(), 'shares': set()}
