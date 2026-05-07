@@ -26,6 +26,23 @@ PRESETS = {
 }
 
 
+def _sq(s):
+    """Shell-quote: always wrap in single quotes, escaping any embedded single quotes."""
+    return "'" + s.replace("'", "'\"'\"'") + "'"
+
+
+def build_smb_auth(args):
+    """Build the auth-string fragment used by smbcacls and rpcclient.
+
+    Kerberos: --use-krb5-ccache=<PATH> -U '<USER>'
+    NTLM:     -U '<USER>%<PASS>'
+    """
+    if args.kerberos:
+        ccache_part = f"--use-krb5-ccache={shlex.quote(args.ccache)}"
+        return f"{ccache_part} -U {_sq(args.username)}"
+    return f"-U {_sq(f'{args.username}%{args.password}')}"
+
+
 def load_exclusions(exclude_file):
     """Load exclusion list from file. Format: hostname or hostname,share (one per line)"""
     exclusions = {'hosts': set(), 'shares': set()}
