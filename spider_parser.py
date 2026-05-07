@@ -7,6 +7,7 @@ import os
 import re
 import shlex
 import socket
+import subprocess
 import sys
 import argparse
 
@@ -116,6 +117,22 @@ def load_exclusions(exclude_file):
     return exclusions
 
 
+def run_or_print(cmd, do_exec):
+    """Print a shell command, optionally executing it under shell=True.
+
+    Fail-fast: if do_exec is True and the command exits non-zero, write a
+    marker to stderr and sys.exit() with the same return code. Output is
+    not captured — the child inherits the parent terminal.
+    """
+    print(cmd, flush=True)
+    if not do_exec:
+        return
+    rc = subprocess.run(cmd, shell=True).returncode
+    if rc != 0:
+        print(f"# ERROR: command failed (exit {rc}): {cmd}", file=sys.stderr)
+        sys.exit(rc)
+
+
 def main():
     parser = argparse.ArgumentParser(description='', epilog=f'Available presets: {", ".join(PRESETS.keys())}')
     parser.add_argument('-d','--dir', type=str, default=os.path.expanduser('~/.nxc/modules/nxc_spider_plus/'), help='Directory of nxc spider_plus output. Default is ~/.nxc/modules/nxc_spider_plus/')
@@ -123,7 +140,10 @@ def main():
     parser.add_argument('-P', '--presets', type=str, help='Comma-separated preset names or path to JSON file containing presets')
 
     parser.add_argument('-m','--mount',default=False, action=argparse.BooleanOptionalAction, help='Display commands necessary to create mount shares')
-    parser.add_argument('-a','--acl',default=False, action=argparse.BooleanOptionalAction, help='Display commands to audit DACLs (smbcacls + rpcclient netsharegetinfo)')
+    parser.add_argument('-a','--acl',default=False, action=argparse.BooleanOptionalAction, help='Display commands to audit DACLs (smbcacls)')
+    exec_group = parser.add_mutually_exclusive_group()
+    exec_group.add_argument('--exec', default=False, action='store_true', help='Execute each emitted command via subprocess (fail-fast on non-zero exit)')
+    exec_group.add_argument('--dry-run', default=False, action='store_true', help='Print only; explicit no-op form of the default behavior (mutually exclusive with --exec)')
     parser.add_argument('-u','--username', help='Username for mount/acl auth (passed verbatim into -U)')
     parser.add_argument('-p','--password', help='Password for NTLM auth (mount/acl)')
     parser.add_argument('-D','--domain', help='Domain for NTLM auth; produces -U user@domain%%password (mount/acl)')
@@ -137,6 +157,8 @@ def main():
     parser.add_argument('--exclude-host', type=str, action='append', default=[], help='Exclude files whose name contains this substring (case-insensitive). Can be used multiple times.')
     args = parser.parse_args()
     validate_auth(parser, args)
+    if args.exec and not (args.mount or args.acl):
+        parser.error("--exec requires --mount or --acl")
 
     if args.list_presets:
         print("Available regex presets:")
@@ -250,11 +272,11 @@ def main():
                 continue
             unc = f'//{ip}/{share}'
             mount_point = f'/mnt/{hostname}/{share}'
-            print(f'mkdir -p {shlex.quote(mount_point)}')
+            run_or_print(f'mkdir -p {shlex.quote(mount_point)}', args.exec)
             mount_cmd = f'mount -t cifs {shlex.quote(unc)} {shlex.quote(mount_point)} -o {shlex.quote(opts)}'
             if env:
                 mount_cmd = f'{env} {mount_cmd}'
-            print(mount_cmd)
+            run_or_print(mount_cmd, args.exec)
             mount_emitted = True
 
     if args.acl:
@@ -267,7 +289,7 @@ def main():
                 continue
             unc = f'//{ip}/{share}'
             print(f'# {hostname} / {share} \u2014 DACL audit')
-            print(f"smbcacls {shlex.quote(unc)} '/' {auth}")
+            run_or_print(f"smbcacls {shlex.quote(unc)} '/' {auth}", args.exec)
 
 
 if __name__ == '__main__':
