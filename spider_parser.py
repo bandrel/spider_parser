@@ -137,7 +137,7 @@ def main():
     parser = argparse.ArgumentParser(description='', epilog=f'Available presets: {", ".join(PRESETS.keys())}')
     parser.add_argument('-d','--dir', type=str, default=os.path.expanduser('~/.nxc/modules/nxc_spider_plus/'), help='Directory of nxc spider_plus output. Default is ~/.nxc/modules/nxc_spider_plus/')
     parser.add_argument('REGEX', type=str, nargs='?', help='Regex pattern or preset name to search for')
-    parser.add_argument('-P', '--presets', type=str, help='Comma-separated preset names or path to JSON file containing presets')
+    parser.add_argument('-P', '--presets', type=str, nargs='?', const='', default=None, help='Comma-separated preset names or path to JSON file containing presets. Pass without a value to list available presets.')
 
     parser.add_argument('-m','--mount',default=False, action=argparse.BooleanOptionalAction, help='Display commands necessary to create mount shares')
     parser.add_argument('-a','--acl',default=False, action=argparse.BooleanOptionalAction, help='Display commands to audit DACLs (smbcacls)')
@@ -160,7 +160,7 @@ def main():
     if args.exec and not (args.mount or args.acl):
         parser.error("--exec requires --mount or --acl")
 
-    if args.list_presets:
+    if args.list_presets or args.presets == '':
         print("Available regex presets:")
         for name, pattern in sorted(PRESETS.items()):
             print(f"  {name:15} - {pattern}")
