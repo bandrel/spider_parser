@@ -1,4 +1,5 @@
 import json
+import socket
 import sys
 
 import pytest
@@ -78,3 +79,22 @@ def test_mount_only_no_blank_line_without_acl(tmp_path, monkeypatch, capsys):
     ])
     # No DACL audit comments appear, no trailing blank line from acl branch.
     assert "DACL audit" not in out.out
+
+
+def test_mount_acl_no_spurious_blank_when_dns_fails(tmp_path, monkeypatch, capsys):
+    """Regression: when all DNS lookups fail, --mount --acl must emit no stdout
+    and in particular no spurious blank-only line between the two blocks."""
+    def _fail(hostname):
+        raise socket.gaierror(f"no such host: {hostname}")
+    monkeypatch.setattr(socket, "gethostbyname", _fail)
+    d = _make_input_file(tmp_path, "host.example.invalid", {"C$": ["password.txt"]})
+    out = _run_main(monkeypatch, capsys, [
+        "spider-parser", "-d", f"{d}/",
+        "-m", "-a", "-u", "alice", "-p", "hunter2", "password",
+    ])
+    assert "# " not in out.out
+    assert "smbcacls" not in out.out
+    assert "rpcclient" not in out.out
+    # No blank-only line: every emitted line should be non-empty (no spurious
+    # separator from the --acl branch when --mount produced zero lines).
+    assert all(line != "" for line in out.out.splitlines())
