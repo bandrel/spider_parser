@@ -57,6 +57,19 @@ def test_acl_share_with_space_is_shell_quoted(tmp_path, monkeypatch, capsys):
     assert "smbcacls '//127.0.0.1/My Share' '/' -U 'alice%hunter2'" in out.out
 
 
+def test_acl_share_with_double_quote_is_escaped_in_rpc_payload(tmp_path, monkeypatch, capsys):
+    """Hardening: a literal double-quote in a share name must not break the
+    inner quoting of the rpcclient -c payload."""
+    d = _make_input_file(tmp_path, "127.0.0.1", {'My"Share': ["password.txt"]})
+    out = _run_main(monkeypatch, capsys, [
+        "spider-parser", "-d", f"{d}/",
+        "-a", "-u", "alice", "-p", "hunter2", "password",
+    ])
+    # The inner double-quote in the share name is backslash-escaped inside the
+    # double-quoted netsharegetinfo argument.
+    assert 'rpcclient -U \'alice%hunter2\' 127.0.0.1 -c \'netsharegetinfo "My\\"Share" 502\'' in out.out
+
+
 def test_combined_mount_acl_separates_blocks_with_blank_line(tmp_path, monkeypatch, capsys):
     d = _make_input_file(tmp_path, "127.0.0.1", {"C$": ["password.txt"]})
     out = _run_main(monkeypatch, capsys, [

@@ -266,7 +266,8 @@ def main():
             unc = f'//{ip}/{share}'
             print(f'# {hostname} / {share} \u2014 DACL audit')
             print(f"smbcacls {shlex.quote(unc)} '/' {auth}")
-            rpc_cmd = f'netsharegetinfo "{share}" 502'
+            share_q = share.replace('"', '\\"')
+            rpc_cmd = f'netsharegetinfo "{share_q}" 502'
             print(f"rpcclient {auth} {ip} -c {shlex.quote(rpc_cmd)}")
 
 
