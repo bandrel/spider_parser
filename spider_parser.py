@@ -289,7 +289,7 @@ def main():
                 continue
             unc = f'//{ip}/{share}'
             print(f'# {hostname} / {share} \u2014 DACL audit')
-            print(f"smbcacls {shlex.quote(unc)} '/' {auth}")
+            run_or_print(f"smbcacls {shlex.quote(unc)} '/' {auth}", args.exec)
 
 
 if __name__ == '__main__':
