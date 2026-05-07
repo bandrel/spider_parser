@@ -7,6 +7,7 @@ import os
 import re
 import shlex
 import socket
+import subprocess
 import sys
 import argparse
 
@@ -114,6 +115,22 @@ def load_exclusions(exclude_file):
     except FileNotFoundError:
         pass
     return exclusions
+
+
+def run_or_print(cmd, do_exec):
+    """Print a shell command, optionally executing it under shell=True.
+
+    Fail-fast: if do_exec is True and the command exits non-zero, write a
+    marker to stderr and sys.exit() with the same return code. Output is
+    not captured — the child inherits the parent terminal.
+    """
+    print(cmd)
+    if not do_exec:
+        return
+    rc = subprocess.run(cmd, shell=True).returncode
+    if rc != 0:
+        print(f"# ERROR: command failed (exit {rc}): {cmd}", file=sys.stderr)
+        sys.exit(rc)
 
 
 def main():
