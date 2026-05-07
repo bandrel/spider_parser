@@ -272,11 +272,11 @@ def main():
                 continue
             unc = f'//{ip}/{share}'
             mount_point = f'/mnt/{hostname}/{share}'
-            print(f'mkdir -p {shlex.quote(mount_point)}')
+            run_or_print(f'mkdir -p {shlex.quote(mount_point)}', args.exec)
             mount_cmd = f'mount -t cifs {shlex.quote(unc)} {shlex.quote(mount_point)} -o {shlex.quote(opts)}'
             if env:
                 mount_cmd = f'{env} {mount_cmd}'
-            print(mount_cmd)
+            run_or_print(mount_cmd, args.exec)
             mount_emitted = True
 
     if args.acl:
