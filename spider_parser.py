@@ -122,8 +122,11 @@ def main():
     parser.add_argument('-P', '--presets', type=str, help='Comma-separated preset names or path to JSON file containing presets')
 
     parser.add_argument('-m','--mount',default=False, action=argparse.BooleanOptionalAction, help='Display commands necessary to create mount shares')
-    parser.add_argument('-u','--username', help='Username for mount')
-    parser.add_argument('-p','--password', help='password for mount')
+    parser.add_argument('-a','--acl',default=False, action=argparse.BooleanOptionalAction, help='Display commands to audit DACLs (smbcacls + rpcclient netsharegetinfo)')
+    parser.add_argument('-u','--username', help='Username for mount/acl auth (passed verbatim into -U)')
+    parser.add_argument('-p','--password', help='Password for NTLM auth (mount/acl)')
+    parser.add_argument('-k','--kerberos', default=False, action='store_true', help='Use Kerberos auth (requires --ccache and -u)')
+    parser.add_argument('--ccache', help='Path to Kerberos credential cache file (used with -k for --mount and --acl)')
     parser.add_argument('--include-sysvol', default=False, action='store_true', help='Include SYSVOL share (ignored by default)')
     parser.add_argument('--list-presets', action='store_true', help='List all available regex presets')
     parser.add_argument('-y','--yolo', action='store_true', help='Run all built-in presets (yolo mode)')
@@ -131,6 +134,7 @@ def main():
     parser.add_argument('-H','--host', type=str, action='append', help='Only include specific host(s). Can be used multiple times')
     parser.add_argument('--exclude-host', type=str, action='append', default=[], help='Exclude files whose name contains this substring (case-insensitive). Can be used multiple times.')
     args = parser.parse_args()
+    validate_auth(parser, args)
 
     if args.list_presets:
         print("Available regex presets:")
