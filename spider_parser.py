@@ -228,23 +228,30 @@ def main():
                                     print(f'{hostname},{key},{item}')
                                 matched_shares.add((hostname, key))
                                 break
+    host_ip_cache = {}
+
+    def _resolve(hostname):
+        if hostname not in host_ip_cache:
+            try:
+                host_ip_cache[hostname] = socket.gethostbyname(hostname)
+            except socket.gaierror:
+                print(f'# DNS lookup failed for {hostname}, skipping', file=sys.stderr)
+                host_ip_cache[hostname] = None
+        return host_ip_cache[hostname]
+
     if args.mount:
-        host_ip_cache = {}
+        env, opts = build_mount_opts(args)
         for hostname, share in sorted(matched_shares):
-            if hostname not in host_ip_cache:
-                try:
-                    host_ip_cache[hostname] = socket.gethostbyname(hostname)
-                except socket.gaierror:
-                    print(f'# DNS lookup failed for {hostname}, skipping', file=sys.stderr)
-                    host_ip_cache[hostname] = None
-            ip = host_ip_cache[hostname]
+            ip = _resolve(hostname)
             if ip is None:
                 continue
             unc = f'//{ip}/{share}'
             mount_point = f'/mnt/{hostname}/{share}'
-            opts = f'username={args.username},password={args.password}'
             print(f'mkdir -p {shlex.quote(mount_point)}')
-            print(f'mount -t cifs {shlex.quote(unc)} {shlex.quote(mount_point)} -o {shlex.quote(opts)}')
+            mount_cmd = f'mount -t cifs {shlex.quote(unc)} {shlex.quote(mount_point)} -o {shlex.quote(opts)}'
+            if env:
+                mount_cmd = f'{env} {mount_cmd}'
+            print(mount_cmd)
 
 
 if __name__ == '__main__':
