@@ -15,7 +15,7 @@ def _make_input(tmp_path, hostname, shares):
     return d
 
 
-def test_exec_mount_runs_mkdir_then_mount_per_share(tmp_path, monkeypatch, capsys):
+def test_exec_mount_runs_mkdir_then_mount_per_share(tmp_path, monkeypatch):
     d = _make_input(tmp_path, "127.0.0.1", {"C$": ["password.txt"]})
     calls = []
     def fake_run(cmd, **kwargs):
@@ -34,7 +34,7 @@ def test_exec_mount_runs_mkdir_then_mount_per_share(tmp_path, monkeypatch, capsy
     assert calls[1].startswith("mount -t cifs ")
 
 
-def test_exec_mount_failing_mkdir_aborts_before_mount(tmp_path, monkeypatch, capsys):
+def test_exec_mount_failing_mkdir_aborts_before_mount(tmp_path, monkeypatch):
     d = _make_input(tmp_path, "127.0.0.1", {"C$": ["password.txt"]})
     calls = []
     def fake_run(cmd, **kwargs):
@@ -54,7 +54,7 @@ def test_exec_mount_failing_mkdir_aborts_before_mount(tmp_path, monkeypatch, cap
     assert calls[0].startswith("mkdir -p ")
 
 
-def test_exec_mount_then_acl_fail_fast_aborts_acl_block(tmp_path, monkeypatch, capsys):
+def test_exec_mount_then_acl_fail_fast_aborts_acl_block(tmp_path, monkeypatch):
     d = _make_input(tmp_path, "127.0.0.1", {"C$": ["password.txt"]})
     calls = []
     def fake_run(cmd, **kwargs):

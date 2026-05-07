@@ -15,7 +15,7 @@ def _make_input(tmp_path, hostname, shares):
     return d
 
 
-def test_exec_acl_runs_subprocess_per_smbcacls_line(tmp_path, monkeypatch, capsys):
+def test_exec_acl_runs_subprocess_per_smbcacls_line(tmp_path, monkeypatch):
     d = _make_input(tmp_path, "127.0.0.1", {
         "C$": ["password.txt"],
         "ADMIN$": ["password.txt"],
@@ -54,7 +54,7 @@ def test_dry_run_acl_runs_zero_subprocesses(tmp_path, monkeypatch, capsys):
     assert calls == []
 
 
-def test_exec_acl_fail_fast_aborts_remaining_shares(tmp_path, monkeypatch, capsys):
+def test_exec_acl_fail_fast_aborts_remaining_shares(tmp_path, monkeypatch):
     d = _make_input(tmp_path, "127.0.0.1", {
         "ADMIN$": ["password.txt"],
         "C$": ["password.txt"],

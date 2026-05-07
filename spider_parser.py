@@ -124,7 +124,7 @@ def run_or_print(cmd, do_exec):
     marker to stderr and sys.exit() with the same return code. Output is
     not captured — the child inherits the parent terminal.
     """
-    print(cmd)
+    print(cmd, flush=True)
     if not do_exec:
         return
     rc = subprocess.run(cmd, shell=True).returncode
