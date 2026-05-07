@@ -16,6 +16,14 @@ spider-parser = "spider_parser:main"
 [project.urls]
 Repository = "https://github.com/bandrel/spider_parser"
 
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
 [tool.hatch.build.targets.wheel]
 only-include = ["spider_parser.py"]
 
