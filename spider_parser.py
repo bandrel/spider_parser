@@ -43,6 +43,31 @@ def build_smb_auth(args):
     return f"-U {_sq(f'{args.username}%{args.password}')}"
 
 
+def _mount_val(s):
+    """Escape characters that are special in mount -o opt=val,opt=val strings."""
+    return s.replace(",", "%2C")
+
+
+def build_mount_opts(args):
+    """Build (env_prefix, opts_string) for the mount -t cifs command.
+
+    NTLM:     ("", "username=<U>,password=<P>")
+    Kerberos: ("KRB5CCNAME='FILE:<PATH>'",
+               "sec=krb5,username=<U>,cruid=$(id -u)")
+
+    Returns ("", opts) when no env prefix is needed; callers must check
+    `if env:` before prepending it to the mount command.
+
+    Commas in username/password are percent-encoded so they don't get
+    parsed as -o option separators by mount.cifs.
+    """
+    if args.kerberos:
+        env = f"KRB5CCNAME={_sq(f'FILE:{args.ccache}')}"
+        opts = f"sec=krb5,username={_mount_val(args.username)},cruid=$(id -u)"
+        return env, opts
+    return "", f"username={_mount_val(args.username)},password={_mount_val(args.password)}"
+
+
 def load_exclusions(exclude_file):
     """Load exclusion list from file. Format: hostname or hostname,share (one per line)"""
     exclusions = {'hosts': set(), 'shares': set()}
