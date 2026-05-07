@@ -37,16 +37,23 @@ By default `--dir` is `~/.nxc/modules/nxc_spider_plus/`. The mount form resolves
 ### Audit DACLs
 
 ```sh
-# Emit DACL audit commands (smbcacls + rpcclient netsharegetinfo)
+# Emit smbcacls DACL audit commands
 spider-parser -a -u USER -p PASS '.*'
+
+# With NTLM domain (-U user@domain%password format)
+spider-parser -a -u USER -p PASS -D CORP '.*'
 
 # DACL audit with Kerberos
 spider-parser -a -k -u 'DOMAIN.COM/USER' --ccache /path/to/USER.ccache '.*'
 ```
 
-For each matched share, emits a `smbcacls` command (NTFS DACL layer) and a `rpcclient netsharegetinfo ... 502` command (SMB share-level perms). May be combined with `-m` to emit both blocks.
+For each matched share, emits a `smbcacls` command (NTFS DACL layer). May be combined with `-m` to emit both blocks.
 
 ## Version history
+
+### v0.2.1
+- Added `-D/--domain` for NTLM auth (`-U user@domain%password` format)
+- Dropped `rpcclient netsharegetinfo` line from `--acl` output (level 502 requires admin and returned `WERR_ACCESS_DENIED` for typical users; `smbcacls` covers the audit need)
 
 ### v0.2.0
 - Added `-a/--acl` mode to emit DACL audit commands (`smbcacls` + `rpcclient netsharegetinfo`) per matched share

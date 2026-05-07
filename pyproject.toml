@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "spider-parser"
-version = "0.2.0"
+version = "0.2.1"
 description = "Parse NetExec spider_plus output and generate CIFS mount commands."
 readme = "README.md"
 requires-python = ">=3.9"

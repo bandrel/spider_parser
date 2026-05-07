@@ -35,12 +35,13 @@ def build_smb_auth(args):
     """Build the auth-string fragment used by smbcacls and rpcclient.
 
     Kerberos: --use-krb5-ccache=<PATH> -U '<USER>'
-    NTLM:     -U '<USER>%<PASS>'
+    NTLM:     -U '<USER>[@<DOMAIN>]%<PASS>'
     """
     if args.kerberos:
         ccache_part = f"--use-krb5-ccache={shlex.quote(args.ccache)}"
         return f"{ccache_part} -U {_sq(args.username)}"
-    return f"-U {_sq(f'{args.username}%{args.password}')}"
+    user_part = f"{args.username}@{args.domain}" if args.domain else args.username
+    return f"-U {_sq(f'{user_part}%{args.password}')}"
 
 
 def _mount_val(s):
@@ -125,6 +126,7 @@ def main():
     parser.add_argument('-a','--acl',default=False, action=argparse.BooleanOptionalAction, help='Display commands to audit DACLs (smbcacls + rpcclient netsharegetinfo)')
     parser.add_argument('-u','--username', help='Username for mount/acl auth (passed verbatim into -U)')
     parser.add_argument('-p','--password', help='Password for NTLM auth (mount/acl)')
+    parser.add_argument('-D','--domain', help='Domain for NTLM auth; produces -U user@domain%%password (mount/acl)')
     parser.add_argument('-k','--kerberos', default=False, action='store_true', help='Use Kerberos auth (requires --ccache and -u)')
     parser.add_argument('--ccache', help='Path to Kerberos credential cache file (used with -k for --mount and --acl)')
     parser.add_argument('--include-sysvol', default=False, action='store_true', help='Include SYSVOL share (ignored by default)')
@@ -266,9 +268,6 @@ def main():
             unc = f'//{ip}/{share}'
             print(f'# {hostname} / {share} \u2014 DACL audit')
             print(f"smbcacls {shlex.quote(unc)} '/' {auth}")
-            share_q = share.replace('"', '\\"')
-            rpc_cmd = f'netsharegetinfo "{share_q}" 502'
-            print(f"rpcclient {auth} {ip} -c {shlex.quote(rpc_cmd)}")
 
 
 if __name__ == '__main__':

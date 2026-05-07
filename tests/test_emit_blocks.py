@@ -29,7 +29,17 @@ def test_acl_ntlm_emits_expected_lines(tmp_path, monkeypatch, capsys):
     ])
     assert "# 127.0.0.1 / C$ \u2014 DACL audit" in out.out
     assert "smbcacls '//127.0.0.1/C$' '/' -U 'alice%hunter2'" in out.out
-    assert "rpcclient -U 'alice%hunter2' 127.0.0.1 -c 'netsharegetinfo \"C$\" 502'" in out.out
+    assert "rpcclient" not in out.out
+
+
+def test_acl_ntlm_with_domain_emits_user_at_domain_format(tmp_path, monkeypatch, capsys):
+    """When -D/--domain is set, NTLM auth becomes -U 'user@domain%password'."""
+    d = _make_input_file(tmp_path, "127.0.0.1", {"C$": ["password.txt"]})
+    out = _run_main(monkeypatch, capsys, [
+        "spider-parser", "-d", f"{d}/",
+        "-a", "-u", "alice", "-p", "hunter2", "-D", "CORP", "password",
+    ])
+    assert "smbcacls '//127.0.0.1/C$' '/' -U 'alice@CORP%hunter2'" in out.out
 
 
 def test_acl_kerberos_emits_expected_lines(tmp_path, monkeypatch, capsys):
@@ -43,7 +53,7 @@ def test_acl_kerberos_emits_expected_lines(tmp_path, monkeypatch, capsys):
     assert "# 127.0.0.1 / SYSVOL \u2014 DACL audit" in out.out
     # shlex.quote leaves safe UNCs unquoted; the auth fragment is quoted by build_smb_auth.
     assert "smbcacls //127.0.0.1/SYSVOL '/' --use-krb5-ccache=/tmp/USER.ccache -U 'DOMAIN.COM/USER'" in out.out
-    assert "rpcclient --use-krb5-ccache=/tmp/USER.ccache -U 'DOMAIN.COM/USER' 127.0.0.1 -c 'netsharegetinfo \"SYSVOL\" 502'" in out.out
+    assert "rpcclient" not in out.out
 
 
 def test_acl_share_with_space_is_shell_quoted(tmp_path, monkeypatch, capsys):
@@ -55,19 +65,6 @@ def test_acl_share_with_space_is_shell_quoted(tmp_path, monkeypatch, capsys):
     ])
     # The UNC must be wrapped in single quotes so the space stays inside one argument.
     assert "smbcacls '//127.0.0.1/My Share' '/' -U 'alice%hunter2'" in out.out
-
-
-def test_acl_share_with_double_quote_is_escaped_in_rpc_payload(tmp_path, monkeypatch, capsys):
-    """Hardening: a literal double-quote in a share name must not break the
-    inner quoting of the rpcclient -c payload."""
-    d = _make_input_file(tmp_path, "127.0.0.1", {'My"Share': ["password.txt"]})
-    out = _run_main(monkeypatch, capsys, [
-        "spider-parser", "-d", f"{d}/",
-        "-a", "-u", "alice", "-p", "hunter2", "password",
-    ])
-    # The inner double-quote in the share name is backslash-escaped inside the
-    # double-quoted netsharegetinfo argument.
-    assert 'rpcclient -U \'alice%hunter2\' 127.0.0.1 -c \'netsharegetinfo "My\\"Share" 502\'' in out.out
 
 
 def test_combined_mount_acl_separates_blocks_with_blank_line(tmp_path, monkeypatch, capsys):
