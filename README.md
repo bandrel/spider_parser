@@ -57,6 +57,9 @@ For each matched share, emits a `smbcacls` command (NTFS DACL layer). May be com
 
 ## Version history
 
+### v0.3.2
+- Added `virtualdisks` preset matching virtual hard drive / disk image extensions (`.vmdk`, `.vhd`, `.vhdx`, `.avhd(x)`, `.vdi`, `.vbox`, `.qcow`, `.qcow2`, `.ova`, `.ovf`, `.hdd`, `.pvm`, `.img`, `.iso`)
+
 ### v0.3.1
 - `-P/--presets` with no argument now lists available presets instead of erroring (equivalent to `--list-presets`)
 
