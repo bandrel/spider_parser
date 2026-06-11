@@ -13,18 +13,18 @@ import argparse
 
 # Preset regex patterns
 PRESETS = {
-    'passwords': r'password|passwd|pwd|pass\.txt|credentials|creds|secret',
-    'configs': r'\.config|\.conf|\.ini|\.xml|\.yaml|\.yml|settings',
-    'keys': r'\.key|\.pem|\.pfx|\.p12|\.crt|\.cer|id_rsa|private',
-    'scripts': r'\.ps1|\.bat|\.cmd|\.vbs|\.sh',
+    'passwords': r'password|passwd|pwd|pass\.txt$|credentials|creds|secret',
+    'configs': r'\.config$|\.conf$|\.ini$|\.xml$|\.yaml$|\.yml$|settings',
+    'keys': r'\.key$|\.pem$|\.pfx$|\.p12$|\.crt$|\.cer$|id_rsa|private',
+    'scripts': r'\.ps1$|\.bat$|\.cmd$|\.vbs$|\.sh$',
     'sensitive': r'password|secret|key|token|api|credential|private|confidential',
-    'database': r'\.sql|\.db|\.mdb|\.accdb|\.sqlite|\.csv|database|backup\.bak',
-    'backup': r'\.bak|\.backup|\.old|\.tmp|\.swp|\.csv|~',
-    'code': r'\.py|\.java|\.cpp|\.c|\.cs|\.js|\.php|\.rb|\.go',
-    'documents': r'\.doc|\.docx|\.xls|\.xlsx|\.pdf|\.txt|\.rtf|\.odt',
-    'web': r'\.html|\.htm|\.asp|\.aspx|\.jsp|\.php',
-    'financial': r'invoice|receipt|payment|budget|financial|accounting|payroll|salary|tax|revenue|expense|profit|loss|balance|statement|quickbooks|\.qb[owx]|sage|xero',
-    'virtualdisks': r'\.vmdk|\.vhdx?|\.vdi|\.qcow2?|\.ova|\.ovf|\.hdd|\.pvm|\.vbox|\.img|\.iso|\.avhdx?',
+    'database': r'\.sql$|\.db$|\.mdb$|\.accdb$|\.sqlite$|\.csv$|database|backup\.bak$',
+    'backup': r'\.bak$|\.backup$|\.old$|\.tmp$|\.swp$|\.csv$|~$',
+    'code': r'\.py$|\.java$|\.cpp$|\.c$|\.cs$|\.js$|\.php$|\.rb$|\.go$',
+    'documents': r'\.doc$|\.docx$|\.xls$|\.xlsx$|\.pdf$|\.txt$|\.rtf$|\.odt$',
+    'web': r'\.html$|\.htm$|\.asp$|\.aspx$|\.jsp$|\.php$',
+    'financial': r'invoice|receipt|payment|budget|financial|accounting|payroll|salary|tax|revenue|expense|profit|loss|balance|statement|quickbooks|\.qb[owx]$|sage|xero',
+    'virtualdisks': r'\.vmdk$|\.vhdx?$|\.vdi$|\.qcow2?$|\.ova$|\.ovf$|\.hdd$|\.pvm$|\.vbox$|\.img$|\.iso$|\.avhdx?$',
 }
 
 
@@ -151,6 +151,7 @@ def main():
     parser.add_argument('-k','--kerberos', default=False, action='store_true', help='Use Kerberos auth (requires --ccache and -u)')
     parser.add_argument('--ccache', help='Path to Kerberos credential cache file (used with -k for --mount and --acl)')
     parser.add_argument('--include-sysvol', default=False, action='store_true', help='Include SYSVOL share (ignored by default)')
+    parser.add_argument('--include-dll', default=False, action='store_true', help='Include files ending in .dll (excluded by default)')
     parser.add_argument('--list-presets', action='store_true', help='List all available regex presets')
     parser.add_argument('-y','--yolo', action='store_true', help='Run all built-in presets (yolo mode)')
     parser.add_argument('-e','--exclude', type=str, help='Path to exclusion file (format: hostname or hostname,share per line)')
@@ -245,8 +246,15 @@ def main():
                 if key != 'IPC$' and (args.include_sysvol or key != 'SYSVOL'):
                     #if share is not IPC$ then iterate through the items in the share.
                     for item in a[key]:
+                        # Match against the basename only so anchored extension
+                        # patterns and keyword tokens don't trip on directory
+                        # names in the path (SMB uses backslash separators).
+                        name = re.split(r'[\\/]', item)[-1]
+                        # .dll files are noisy; skip them unless --include-dll is set.
+                        if not args.include_dll and name.lower().endswith('.dll'):
+                            continue
                         for label, compiled in pattern_items:
-                            if compiled.search(item):
+                            if compiled.search(name):
                                 if label:
                                     print(f'{hostname},{key},{label},{item}')
                                 else:

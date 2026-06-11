@@ -57,6 +57,11 @@ For each matched share, emits a `smbcacls` command (NTFS DACL layer). May be com
 
 ## Version history
 
+### v0.3.3
+- Added `--include-dll` to include files ending in `.dll` (excluded by default, like `--include-sysvol`)
+- Anchored all preset file-extension patterns with `$` so they only match at the end of a filename (fixes false positives like `\.iso` matching `Microsoft.IsolatedStorage.dll`)
+- Pattern matching now runs against the file basename only, so directory names in the path no longer trigger keyword/extension matches
+
 ### v0.3.2
 - Added `virtualdisks` preset matching virtual hard drive / disk image extensions (`.vmdk`, `.vhd`, `.vhdx`, `.avhd(x)`, `.vdi`, `.vbox`, `.qcow`, `.qcow2`, `.ova`, `.ovf`, `.hdd`, `.pvm`, `.img`, `.iso`)
 
