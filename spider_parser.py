@@ -24,6 +24,7 @@ PRESETS = {
     'documents': r'\.doc|\.docx|\.xls|\.xlsx|\.pdf|\.txt|\.rtf|\.odt',
     'web': r'\.html|\.htm|\.asp|\.aspx|\.jsp|\.php',
     'financial': r'invoice|receipt|payment|budget|financial|accounting|payroll|salary|tax|revenue|expense|profit|loss|balance|statement|quickbooks|\.qb[owx]|sage|xero',
+    'virtualdisks': r'\.vmdk|\.vhdx?|\.vdi|\.qcow2?|\.ova|\.ovf|\.hdd|\.pvm|\.vbox|\.img|\.iso|\.avhdx?',
 }
 
 
