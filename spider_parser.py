@@ -205,6 +205,7 @@ def main():
     parser.add_argument('--ccache', help='Path to Kerberos credential cache file (used with -k for --mount and --acl)')
     parser.add_argument('--include-sysvol', default=False, action='store_true', help='Include SYSVOL share (ignored by default)')
     parser.add_argument('--include-dll', default=False, action='store_true', help='Include files ending in .dll (excluded by default)')
+    parser.add_argument('--domain-readable', default=False, action='store_true', help='Only output files readable by a normal domain user (requires ACL-aware spider_plus output; files without ACL data are dropped)')
     parser.add_argument('--list-presets', action='store_true', help='List all available regex presets')
     parser.add_argument('-y','--yolo', action='store_true', help='Run all built-in presets (yolo mode)')
     parser.add_argument('-e','--exclude', type=str, help='Path to exclusion file (format: hostname or hostname,share per line)')
