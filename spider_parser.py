@@ -274,6 +274,8 @@ def main():
     # Track shares with matches for mount command generation
     matched_shares = set()
 
+    acl_warning_needed = False
+
     for file_path in files:
         file = file_path.split('/')[-1:][0]
         hostname = '.'.join(file.split('.')[:-1])
@@ -296,25 +298,46 @@ def main():
             for key in a.keys():
                 if (hostname, key) in exclusions['shares']:
                     continue
-                #If share is IPC$ we can skip it, also skip SYSVOL unless --include-sysvol is set
-                if key != 'IPC$' and (args.include_sysvol or key != 'SYSVOL'):
-                    #if share is not IPC$ then iterate through the items in the share.
-                    for item in a[key]:
-                        # Match against the basename only so anchored extension
-                        # patterns and keyword tokens don't trip on directory
-                        # names in the path (SMB uses backslash separators).
-                        name = re.split(r'[\\/]', item)[-1]
-                        # .dll files are noisy; skip them unless --include-dll is set.
-                        if not args.include_dll and name.lower().endswith('.dll'):
-                            continue
-                        for label, compiled in pattern_items:
-                            if compiled.search(name):
-                                if label:
-                                    print(f'{hostname},{key},{label},{item}')
-                                else:
-                                    print(f'{hostname},{key},{item}')
-                                matched_shares.add((hostname, key))
-                                break
+                # Skip IPC$ always, and SYSVOL unless --include-sysvol is set.
+                if key == 'IPC$' or (not args.include_sysvol and key == 'SYSVOL'):
+                    continue
+                share_entry = a[key]
+                if isinstance(share_entry, dict):
+                    # New schema: path -> metadata dict. File entries have a
+                    # "size" key; folder/root records carry only "security".
+                    entries = [
+                        (path, meta) for path, meta in share_entry.items()
+                        if path != '' and isinstance(meta, dict) and 'size' in meta
+                    ]
+                else:
+                    # Old schema: a flat list of file-path strings, no ACL data.
+                    if args.domain_readable:
+                        acl_warning_needed = True
+                        continue
+                    entries = [(path, None) for path in share_entry]
+
+                for item, meta in entries:
+                    if args.domain_readable and not is_domain_readable(
+                        (meta or {}).get('security')
+                    ):
+                        continue
+                    # Match against the basename only so anchored extension
+                    # patterns and keyword tokens don't trip on directory
+                    # names in the path (SMB uses backslash separators).
+                    name = re.split(r'[\\/]', item)[-1]
+                    # .dll files are noisy; skip them unless --include-dll is set.
+                    if not args.include_dll and name.lower().endswith('.dll'):
+                        continue
+                    for label, compiled in pattern_items:
+                        if compiled.search(name):
+                            if label:
+                                print(f'{hostname},{key},{label},{item}')
+                            else:
+                                print(f'{hostname},{key},{item}')
+                            matched_shares.add((hostname, key))
+                            break
+    if acl_warning_needed:
+        print('# Note: --domain-readable set but input lacks ACL data (old schema); those entries were dropped.', file=sys.stderr)
     host_ip_cache = {}
 
     def _resolve(hostname):

@@ -1,7 +1,7 @@
 import json
 import sys
 
-from spider_parser import _trustee_is_domain, is_domain_readable
+from spider_parser import _trustee_is_domain, is_domain_readable, main
 
 
 def test_trustee_is_domain_matches_domain_users_with_prefix():
@@ -102,3 +102,84 @@ def test_missing_security_is_not_readable():
 
 def test_empty_dacl_is_not_readable():
     assert is_domain_readable(_sec([])) is False
+
+
+NEW_SCHEMA = {
+    "C$": {
+        "": {"security": {"owner": "DOMAIN\\admin", "group": None, "dacl": []}},
+        "Users": {"security": {"owner": "DOMAIN\\admin", "group": None, "dacl": [
+            {"type": "ALLOWED", "trustee": "DOMAIN\\Domain Users",
+             "rights": ["READ_DATA"], "inherited": True}]}},
+        "Users\\public.txt": {
+            "size": "1.0 KB", "ctime_epoch": "2026-01-01 00:00:00",
+            "mtime_epoch": "2026-01-01 00:00:00", "atime_epoch": "2026-01-01 00:00:00",
+            "security": {"owner": "DOMAIN\\admin", "group": None, "dacl": [
+                {"type": "ALLOWED", "trustee": "DOMAIN\\Domain Users",
+                 "rights": ["READ_DATA", "READ_CONTROL"], "inherited": True}]}},
+        "Users\\secret.txt": {
+            "size": "2.0 KB", "ctime_epoch": "2026-01-01 00:00:00",
+            "mtime_epoch": "2026-01-01 00:00:00", "atime_epoch": "2026-01-01 00:00:00",
+            "security": {"owner": "DOMAIN\\admin", "group": None, "dacl": [
+                {"type": "ALLOWED", "trustee": "DOMAIN\\Administrators",
+                 "rights": ["FULL_CONTROL"], "inherited": False}]}},
+    }
+}
+
+
+def _write_input(tmp_path, hostname, shares):
+    d = tmp_path / "input"
+    d.mkdir()
+    (d / f"{hostname}.json").write_text(json.dumps(shares))
+    return d
+
+
+def _run_main(monkeypatch, capsys, argv):
+    monkeypatch.setattr(sys, "argv", argv)
+    main()
+    return capsys.readouterr()
+
+
+def test_domain_readable_keeps_only_readable_files(tmp_path, monkeypatch, capsys):
+    d = _write_input(tmp_path, "host", NEW_SCHEMA)
+    out = _run_main(monkeypatch, capsys, [
+        "spider-parser", "-d", f"{d}/", "--domain-readable", r"\.txt$",
+    ])
+    assert "public.txt" in out.out
+    assert "secret.txt" not in out.out
+
+
+def test_domain_readable_never_emits_folder_or_root_entries(tmp_path, monkeypatch, capsys):
+    d = _write_input(tmp_path, "host", NEW_SCHEMA)
+    out = _run_main(monkeypatch, capsys, [
+        "spider-parser", "-d", f"{d}/", "--domain-readable", ".",
+    ])
+    assert "host,C$,Users\n" not in out.out
+    assert out.out.count("public.txt") == 1
+
+
+def test_new_schema_without_flag_emits_files_only(tmp_path, monkeypatch, capsys):
+    d = _write_input(tmp_path, "host", NEW_SCHEMA)
+    out = _run_main(monkeypatch, capsys, [
+        "spider-parser", "-d", f"{d}/", r"\.txt$",
+    ])
+    assert "public.txt" in out.out
+    assert "secret.txt" in out.out
+    assert "host,C$,Users\n" not in out.out
+
+
+def test_old_list_schema_still_works(tmp_path, monkeypatch, capsys):
+    d = _write_input(tmp_path, "host", {"C$": ["public.txt", "secret.txt"]})
+    out = _run_main(monkeypatch, capsys, [
+        "spider-parser", "-d", f"{d}/", r"\.txt$",
+    ])
+    assert "public.txt" in out.out
+    assert "secret.txt" in out.out
+
+
+def test_old_list_schema_with_domain_readable_drops_all(tmp_path, monkeypatch, capsys):
+    d = _write_input(tmp_path, "host", {"C$": ["public.txt"]})
+    out = _run_main(monkeypatch, capsys, [
+        "spider-parser", "-d", f"{d}/", "--domain-readable", r"\.txt$",
+    ])
+    assert "public.txt" not in out.out
+    assert "lacks ACL data" in out.err
