@@ -73,11 +73,16 @@ def is_domain_readable(security):
     if not dacl:
         return False
     for ace in dacl:
+        ace_type = ace.get('type')
+        # Only ALLOWED/DENIED ACEs are decisive; skip anything else (object
+        # ACEs, malformed/typeless entries) so the walk keeps looking.
+        if ace_type not in ('ALLOWED', 'DENIED'):
+            continue
         if not _trustee_is_domain(ace.get('trustee')):
             continue
         if not any(r in READ_RIGHTS for r in ace.get('rights', [])):
             continue
-        return ace.get('type') == 'ALLOWED'
+        return ace_type == 'ALLOWED'
     return False
 
 
@@ -337,7 +342,7 @@ def main():
                             matched_shares.add((hostname, key))
                             break
     if acl_warning_needed:
-        print('# Note: --domain-readable set but input lacks ACL data (old schema); those entries were dropped.', file=sys.stderr)
+        print('# Note: --domain-readable set but some input lacks ACL data (legacy schema); entries from those shares were dropped.', file=sys.stderr)
     host_ip_cache = {}
 
     def _resolve(hostname):

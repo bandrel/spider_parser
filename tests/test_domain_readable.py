@@ -92,6 +92,17 @@ def test_deny_for_unrelated_right_does_not_block():
     assert is_domain_readable(sec) is True
 
 
+def test_unknown_ace_type_does_not_short_circuit_walk():
+    # A typeless/unknown ACE for a domain trustee must not stop the walk before
+    # a later valid ALLOW is reached.
+    sec = _sec([
+        {"trustee": "Everyone", "rights": ["READ_DATA"], "inherited": False},
+        {"type": "ALLOWED", "trustee": "DOMAIN\\Domain Users",
+         "rights": ["READ_DATA"], "inherited": True},
+    ])
+    assert is_domain_readable(sec) is True
+
+
 def test_error_security_is_not_readable():
     assert is_domain_readable({"error": "STATUS_ACCESS_DENIED"}) is False
 
