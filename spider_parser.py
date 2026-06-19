@@ -27,6 +27,36 @@ PRESETS = {
     'virtualdisks': r'\.vmdk$|\.vhdx?$|\.vdi$|\.qcow2?$|\.ova$|\.ovf$|\.hdd$|\.pvm$|\.vbox$|\.img$|\.iso$|\.avhdx?$',
 }
 
+# Trustees a normal domain user effectively holds, for --domain-readable.
+# Compared against the resolved ACE trustee name with any DOMAIN\ / BUILTIN\
+# prefix stripped, lowercased.
+DOMAIN_TRUSTEES = frozenset({
+    'domain users',
+    'authenticated users',
+    'everyone',
+    'users',
+})
+
+# Rights that grant read access to a file's data.
+READ_RIGHTS = frozenset({
+    'READ_DATA',
+    'GENERIC_READ',
+    'GENERIC_ALL',
+    'FULL_CONTROL',
+})
+
+
+def _trustee_is_domain(trustee):
+    """True if a resolved ACE trustee is one of the broad domain-user groups.
+
+    Strips any prefix up to and including the last backslash (DOMAIN\\, BUILTIN\\)
+    and compares the remainder case-insensitively against DOMAIN_TRUSTEES.
+    """
+    if not trustee:
+        return False
+    name = trustee.rsplit('\\', 1)[-1].strip().lower()
+    return name in DOMAIN_TRUSTEES
+
 
 def _sq(s):
     """Shell-quote: always wrap in single quotes, escaping any embedded single quotes."""
