@@ -58,6 +58,29 @@ def _trustee_is_domain(trustee):
     return name in DOMAIN_TRUSTEES
 
 
+def is_domain_readable(security):
+    """True if a normal domain user could read the file, per its serialized SD.
+
+    Mirrors the Windows DACL access check for an open-for-read: the caller is
+    modeled as holding all DOMAIN_TRUSTEES memberships at once, and the DACL is
+    walked in stored order. The first ACE that targets one of those trustees and
+    carries a read-relevant right decides: DENIED -> not readable, ALLOWED ->
+    readable. Missing/error/no-DACL security is treated as not provably readable.
+    """
+    if not security or 'error' in security:
+        return False
+    dacl = security.get('dacl')
+    if not dacl:
+        return False
+    for ace in dacl:
+        if not _trustee_is_domain(ace.get('trustee')):
+            continue
+        if not any(r in READ_RIGHTS for r in ace.get('rights', [])):
+            continue
+        return ace.get('type') == 'ALLOWED'
+    return False
+
+
 def _sq(s):
     """Shell-quote: always wrap in single quotes, escaping any embedded single quotes."""
     return "'" + s.replace("'", "'\"'\"'") + "'"
