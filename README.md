@@ -33,6 +33,9 @@ sudo spider-parser -m --exec -u USER -p PASS '.*'
 
 # Custom output directory
 spider-parser -d /path/to/spider_plus/ '.*'
+
+# Only show files a normal domain user can read (needs ACL-aware spider_plus output)
+spider-parser --domain-readable '\.kdbx$'
 ```
 
 By default `--dir` is `~/.nxc/modules/nxc_spider_plus/`. The mount form resolves each hostname to an IP for the UNC path while keeping the hostname in the local mount point under `/mnt/`. Share names with spaces, dollar signs, or apostrophes are properly shell-escaped.
@@ -55,7 +58,29 @@ spider-parser -a --exec -u USER -p PASS '.*'
 
 For each matched share, emits a `smbcacls` command (NTFS DACL layer). May be combined with `-m` to emit both blocks. Pass `--exec` to run each emitted command (fail-fast on first non-zero exit) or `--dry-run` for an explicit print-only mode (default behavior).
 
+### Filter by domain-user readability
+
+```sh
+# Drop files a normal domain user couldn't read, then filter by regex
+spider-parser --domain-readable 'password'
+
+# Combine with presets / yolo
+spider-parser --domain-readable -P passwords,keys
+```
+
+`--domain-readable` keeps only files whose per-file ACL grants read access to a normal
+domain user, computed from the ACL data in ACL-aware `spider_plus` output (NetExec
+`feature/spider-plus-acl`). It follows the Windows DACL access check: the caller is
+modeled as a member of `Domain Users`, `Authenticated Users`, `Everyone`, and
+`BUILTIN\Users`, and the DACL is walked in order, so a `DENY` only wins when it precedes
+the matching `ALLOW`. Files whose output lacks ACL data (older `spider_plus` schema)
+cannot be proven readable and are dropped (with a one-line note on stderr).
+
 ## Version history
+
+### v0.4.0
+- Added `--domain-readable` to output only files readable by a normal domain user, using the per-file ACLs in ACL-aware `spider_plus` output (Windows-faithful, order-sensitive DACL evaluation; deny wins only when it precedes the grant)
+- Parser now handles the new `spider_plus` JSON schema (per-file metadata dict) in addition to the legacy list-of-paths schema; folder and share-root records are skipped so output stays file-only
 
 ### v0.3.3
 - Added `--include-dll` to include files ending in `.dll` (excluded by default, like `--include-sysvol`)
