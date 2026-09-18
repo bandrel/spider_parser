@@ -73,8 +73,10 @@ domain user, computed from the ACL data in ACL-aware `spider_plus` output (NetEx
 `feature/spider-plus-acl`). It follows the Windows DACL access check: the caller is
 modeled as a member of `Domain Users`, `Authenticated Users`, `Everyone`, and
 `BUILTIN\Users`, and the DACL is walked in order, so a `DENY` only wins when it precedes
-the matching `ALLOW`. Files whose output lacks ACL data (older `spider_plus` schema)
-cannot be proven readable and are dropped (with a one-line note on stderr).
+the matching `ALLOW`. Files whose output lacks ACL data — the older `spider_plus` schema,
+or a current-schema run made without security-descriptor reads — cannot be proven readable
+and are dropped, with a one-line note on stderr so an empty result is distinguishable from
+"nothing matched".
 
 ## Version history
 

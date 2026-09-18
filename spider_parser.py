@@ -65,9 +65,10 @@ def is_domain_readable(security):
     modeled as holding all DOMAIN_TRUSTEES memberships at once, and the DACL is
     walked in stored order. The first ACE that targets one of those trustees and
     carries a read-relevant right decides: DENIED -> not readable, ALLOWED ->
-    readable. Missing/error/no-DACL security is treated as not provably readable.
+    readable. Missing/error/no-DACL security is treated as not provably readable,
+    as is any non-dict value (an SD serialized as a bare "unknown" string).
     """
-    if not security or 'error' in security:
+    if not isinstance(security, dict) or 'error' in security:
         return False
     dacl = security.get('dacl')
     if not dacl:
@@ -322,10 +323,17 @@ def main():
                     entries = [(path, None) for path in share_entry]
 
                 for item, meta in entries:
-                    if args.domain_readable and not is_domain_readable(
-                        (meta or {}).get('security')
-                    ):
-                        continue
+                    if args.domain_readable:
+                        security = (meta or {}).get('security')
+                        if security is None:
+                            # New schema, but spider_plus ran without SD reads:
+                            # no ACL data to judge against, same as the legacy
+                            # schema. Warn so an empty result is not mistaken
+                            # for "nothing matched".
+                            acl_warning_needed = True
+                            continue
+                        if not is_domain_readable(security):
+                            continue
                     # Match against the basename only so anchored extension
                     # patterns and keyword tokens don't trip on directory
                     # names in the path (SMB uses backslash separators).
@@ -342,7 +350,7 @@ def main():
                             matched_shares.add((hostname, key))
                             break
     if acl_warning_needed:
-        print('# Note: --domain-readable set but some input lacks ACL data (legacy schema); entries from those shares were dropped.', file=sys.stderr)
+        print('# Note: --domain-readable set but some input lacks ACL data (legacy schema, or spidered without security descriptors); those entries were dropped.', file=sys.stderr)
     host_ip_cache = {}
 
     def _resolve(hostname):

@@ -115,6 +115,12 @@ def test_empty_dacl_is_not_readable():
     assert is_domain_readable(_sec([])) is False
 
 
+def test_non_dict_security_is_not_readable():
+    # spider_plus may serialize an unreadable SD as a bare string rather than
+    # an {"error": ...} dict; that must not raise.
+    assert is_domain_readable("unknown") is False
+
+
 NEW_SCHEMA = {
     "C$": {
         "": {"security": {"owner": "DOMAIN\\admin", "group": None, "dacl": []}},
@@ -185,6 +191,32 @@ def test_old_list_schema_still_works(tmp_path, monkeypatch, capsys):
     ])
     assert "public.txt" in out.out
     assert "secret.txt" in out.out
+
+
+def test_new_schema_without_security_warns_instead_of_silently_dropping(
+    tmp_path, monkeypatch, capsys
+):
+    # spider_plus run without SD reads: new dict schema, file entries carry
+    # size but no security block. Dropping them all must not look like
+    # "nothing matched".
+    d = _write_input(tmp_path, "host", {
+        "C$": {"Users\\public.txt": {"size": "1.0 KB"}},
+    })
+    out = _run_main(monkeypatch, capsys, [
+        "spider-parser", "-d", f"{d}/", "--domain-readable", r"\.txt$",
+    ])
+    assert "public.txt" not in out.out
+    assert "lacks ACL data" in out.err
+
+
+def test_new_schema_string_security_does_not_crash(tmp_path, monkeypatch, capsys):
+    d = _write_input(tmp_path, "host", {
+        "C$": {"Users\\a.txt": {"size": "1.0 KB", "security": "unknown"}},
+    })
+    out = _run_main(monkeypatch, capsys, [
+        "spider-parser", "-d", f"{d}/", "--domain-readable", r"\.txt$",
+    ])
+    assert "a.txt" not in out.out
 
 
 def test_old_list_schema_with_domain_readable_drops_all(tmp_path, monkeypatch, capsys):
