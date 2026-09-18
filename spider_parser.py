@@ -58,6 +58,22 @@ def _trustee_is_domain(trustee):
     return name in DOMAIN_TRUSTEES
 
 
+def _has_acl_data(security):
+    """True if this entry's security block carries a DACL we can evaluate.
+
+    An {"error": ...} block counts as data: the SD read was attempted and
+    answered, so dropping the file is a determinate verdict rather than a gap
+    in the input. An empty "dacl" also counts -- that is a deny-everyone SD,
+    not a missing one. Anything else (no security block at all, a bare string,
+    a dict with no "dacl" key) means the spider recorded no ACL data.
+    """
+    if not isinstance(security, dict):
+        return False
+    if 'error' in security:
+        return True
+    return isinstance(security.get('dacl'), list)
+
+
 def is_domain_readable(security):
     """True if a normal domain user could read the file, per its serialized SD.
 
@@ -65,14 +81,17 @@ def is_domain_readable(security):
     modeled as holding all DOMAIN_TRUSTEES memberships at once, and the DACL is
     walked in stored order. The first ACE that targets one of those trustees and
     carries a read-relevant right decides: DENIED -> not readable, ALLOWED ->
-    readable. Missing/error/no-DACL security is treated as not provably readable.
+    readable. Missing/error/no-DACL security is treated as not provably readable,
+    as is any non-dict value (an SD serialized as a bare "unknown" string).
     """
-    if not security or 'error' in security:
+    if not isinstance(security, dict) or 'error' in security:
         return False
     dacl = security.get('dacl')
-    if not dacl:
+    if not dacl or not isinstance(dacl, list):
         return False
     for ace in dacl:
+        if not isinstance(ace, dict):
+            continue
         ace_type = ace.get('type')
         # Only ALLOWED/DENIED ACEs are decisive; skip anything else (object
         # ACEs, malformed/typeless entries) so the walk keeps looking.
@@ -322,10 +341,17 @@ def main():
                     entries = [(path, None) for path in share_entry]
 
                 for item, meta in entries:
-                    if args.domain_readable and not is_domain_readable(
-                        (meta or {}).get('security')
-                    ):
-                        continue
+                    if args.domain_readable:
+                        security = (meta or {}).get('security')
+                        if not _has_acl_data(security):
+                            # New schema, but spider_plus ran without SD reads
+                            # (or wrote an unusable block): no ACL data to judge
+                            # against, same as the legacy schema. Warn so an
+                            # empty result is not mistaken for "nothing matched".
+                            acl_warning_needed = True
+                            continue
+                        if not is_domain_readable(security):
+                            continue
                     # Match against the basename only so anchored extension
                     # patterns and keyword tokens don't trip on directory
                     # names in the path (SMB uses backslash separators).
@@ -342,7 +368,7 @@ def main():
                             matched_shares.add((hostname, key))
                             break
     if acl_warning_needed:
-        print('# Note: --domain-readable set but some input lacks ACL data (legacy schema); entries from those shares were dropped.', file=sys.stderr)
+        print('# Note: --domain-readable set but some input lacks ACL data (legacy schema, or spidered without security descriptors); those entries were dropped.', file=sys.stderr)
     host_ip_cache = {}
 
     def _resolve(hostname):
