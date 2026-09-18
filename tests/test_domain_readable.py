@@ -121,6 +121,23 @@ def test_non_dict_security_is_not_readable():
     assert is_domain_readable("unknown") is False
 
 
+def test_malformed_dacl_container_is_not_readable():
+    # A dacl that is not a list of ACE dicts must not raise.
+    assert is_domain_readable({"dacl": "invalid"}) is False
+
+
+def test_malformed_ace_entries_are_skipped():
+    # Non-dict ACEs must be skipped, not crash, and must not stop the walk
+    # before a later valid ALLOW.
+    sec = _sec([
+        1,
+        "garbage",
+        {"type": "ALLOWED", "trustee": "DOMAIN\\Domain Users",
+         "rights": ["READ_DATA"], "inherited": True},
+    ])
+    assert is_domain_readable(sec) is True
+
+
 NEW_SCHEMA = {
     "C$": {
         "": {"security": {"owner": "DOMAIN\\admin", "group": None, "dacl": []}},
@@ -217,6 +234,45 @@ def test_new_schema_string_security_does_not_crash(tmp_path, monkeypatch, capsys
         "spider-parser", "-d", f"{d}/", "--domain-readable", r"\.txt$",
     ])
     assert "a.txt" not in out.out
+    # An unusable SD is still "no ACL data to judge against" -> must warn.
+    assert "lacks ACL data" in out.err
+
+
+def test_security_without_dacl_key_warns(tmp_path, monkeypatch, capsys):
+    d = _write_input(tmp_path, "host", {
+        "C$": {"Users\\a.txt": {"size": "1.0 KB",
+                                "security": {"owner": "DOMAIN\\admin"}}},
+    })
+    out = _run_main(monkeypatch, capsys, [
+        "spider-parser", "-d", f"{d}/", "--domain-readable", r"\.txt$",
+    ])
+    assert "a.txt" not in out.out
+    assert "lacks ACL data" in out.err
+
+
+def test_malformed_dacl_warns(tmp_path, monkeypatch, capsys):
+    d = _write_input(tmp_path, "host", {
+        "C$": {"Users\\a.txt": {"size": "1.0 KB", "security": {"dacl": "invalid"}}},
+    })
+    out = _run_main(monkeypatch, capsys, [
+        "spider-parser", "-d", f"{d}/", "--domain-readable", r"\.txt$",
+    ])
+    assert "a.txt" not in out.out
+    assert "lacks ACL data" in out.err
+
+
+def test_empty_dacl_is_a_verdict_not_missing_data(tmp_path, monkeypatch, capsys):
+    # An SD that was read successfully and has an empty DACL denies everyone.
+    # That is a real answer, not absent ACL data -- it must NOT warn.
+    d = _write_input(tmp_path, "host", {
+        "C$": {"Users\\a.txt": {"size": "1.0 KB",
+                                "security": {"owner": "DOMAIN\\admin", "dacl": []}}},
+    })
+    out = _run_main(monkeypatch, capsys, [
+        "spider-parser", "-d", f"{d}/", "--domain-readable", r"\.txt$",
+    ])
+    assert "a.txt" not in out.out
+    assert out.err == ""
 
 
 def test_old_list_schema_with_domain_readable_drops_all(tmp_path, monkeypatch, capsys):

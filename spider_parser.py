@@ -58,6 +58,22 @@ def _trustee_is_domain(trustee):
     return name in DOMAIN_TRUSTEES
 
 
+def _has_acl_data(security):
+    """True if this entry's security block carries a DACL we can evaluate.
+
+    An {"error": ...} block counts as data: the SD read was attempted and
+    answered, so dropping the file is a determinate verdict rather than a gap
+    in the input. An empty "dacl" also counts -- that is a deny-everyone SD,
+    not a missing one. Anything else (no security block at all, a bare string,
+    a dict with no "dacl" key) means the spider recorded no ACL data.
+    """
+    if not isinstance(security, dict):
+        return False
+    if 'error' in security:
+        return True
+    return isinstance(security.get('dacl'), list)
+
+
 def is_domain_readable(security):
     """True if a normal domain user could read the file, per its serialized SD.
 
@@ -71,9 +87,11 @@ def is_domain_readable(security):
     if not isinstance(security, dict) or 'error' in security:
         return False
     dacl = security.get('dacl')
-    if not dacl:
+    if not dacl or not isinstance(dacl, list):
         return False
     for ace in dacl:
+        if not isinstance(ace, dict):
+            continue
         ace_type = ace.get('type')
         # Only ALLOWED/DENIED ACEs are decisive; skip anything else (object
         # ACEs, malformed/typeless entries) so the walk keeps looking.
@@ -325,11 +343,11 @@ def main():
                 for item, meta in entries:
                     if args.domain_readable:
                         security = (meta or {}).get('security')
-                        if security is None:
-                            # New schema, but spider_plus ran without SD reads:
-                            # no ACL data to judge against, same as the legacy
-                            # schema. Warn so an empty result is not mistaken
-                            # for "nothing matched".
+                        if not _has_acl_data(security):
+                            # New schema, but spider_plus ran without SD reads
+                            # (or wrote an unusable block): no ACL data to judge
+                            # against, same as the legacy schema. Warn so an
+                            # empty result is not mistaken for "nothing matched".
                             acl_warning_needed = True
                             continue
                         if not is_domain_readable(security):
