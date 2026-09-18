@@ -78,7 +78,18 @@ or a current-schema run made without security-descriptor reads — cannot be pro
 and are dropped, with a one-line note on stderr so an empty result is distinguishable from
 "nothing matched".
 
+The verdict is computed from each file's own DACL; share-root and parent-folder DACLs are
+not consulted. This matches default Windows behavior, where "Bypass traverse checking"
+(`SeChangeNotifyPrivilege`) is granted to Everyone and so a restrictive parent directory
+does not by itself prevent opening a file whose own DACL grants read. On a host where that
+privilege has been removed, a listed file may not actually be reachable.
+
 ## Version history
+
+### v0.4.1
+- `--domain-readable` now warns when the input carries no ACL data to judge against, instead of silently emitting nothing; previously the note only fired for the legacy schema, so a current-schema spider run made without security-descriptor reads produced an empty result with no explanation
+- Hardened security-descriptor parsing against malformed input: a non-dict `security` block or a `dacl` that is not a list of ACEs no longer aborts the run with an `AttributeError`
+- Documented that readability is judged from each file's own DACL, and why parent-directory DACLs are not consulted
 
 ### v0.4.0
 - Added `--domain-readable` to output only files readable by a normal domain user, using the per-file ACLs in ACL-aware `spider_plus` output (Windows-faithful, order-sensitive DACL evaluation; deny wins only when it precedes the grant)
